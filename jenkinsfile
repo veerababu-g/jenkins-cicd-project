@@ -1,0 +1,96 @@
+
+pipeline {
+    agent any
+
+    environment {
+        IMAGE_NAME = "jenkins-cicd"
+        DOCKERHUB_USER = "veerababu324"
+    }
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                echo 'Downloading source code from GitHub'
+                checkout scm
+            }
+        }
+
+        stage('Build') {
+            steps {
+                echo 'Building Docker image'
+                sh 'docker build -t jenkins-cicd:v1 .'
+            }
+        }
+
+        stage('Test') {
+            steps {
+                echo 'Testing Docker image'
+                sh '''
+                    docker run --rm \
+                    --entrypoint sh jenkins-cicd:v1 \
+                    -c "test -f /usr/share/nginx/html/index.html"
+                '''
+            }
+        }
+
+        stage('Docker Login') {
+            steps {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'dockerhub-creds',
+                        usernameVariable: 'DH_USER',
+                        passwordVariable: 'DH_PASS'
+                    )
+                ]) {
+                    sh '''
+                        echo "$DH_PASS" | docker login \
+                        -u "$DH_USER" --password-stdin
+                    '''
+                }
+            }
+        }
+
+        stage('Push to Docker Hub') {
+            steps {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'dockerhub-creds',
+                        usernameVariable: 'veerababu324',
+                        passwordVariable: 'Veerababu2211@'
+                    )
+                ]) {
+                    sh '''
+                        docker tag jenkins-cicd:v1 \
+                        "$DH_USER/jenkins-cicd:v1"
+
+                        docker push "$DH_USER/jenkins-cicd:v1"
+                    '''
+                }
+            }
+        }
+
+        stage('Deploy') {
+            steps {
+                sh '''
+                    docker rm -f jenkins-cicd || true
+
+                    docker run -d \
+                    --name jenkins-cicd \
+                    -p 8080:80 \
+                    "$DOCKERHUB_USER/jenkins-cicd:v1"
+                '''
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'CI/CD Pipeline completed successfully!'
+        }
+
+        failure {
+            echo 'CI/CD Pipeline failed. Check the console output.'
+        }
+    }
+}
