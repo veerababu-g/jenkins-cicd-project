@@ -10,11 +10,11 @@ pipeline {
     stages {
 
         stage('Checkout') {
-            steps {
-                echo 'Downloading source code from GitHub'
-                checkout scm
-            }
-        }
+    steps {
+        git branch: 'main',
+            url: 'https://github.com/veerababu-g/jenkins-cicd-project'
+    }
+}
 
         stage('Build') {
             steps {
